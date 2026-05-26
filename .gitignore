@@ -1,0 +1,104 @@
+# ==========================================
+# EMERGISYNC MASTER GITIGNORE
+# Detailed and highly-specific production-grade gitignore
+# ==========================================
+
+# --- Node & Package Managers ---
+node_modules/
+jspm_packages/
+web_modules/
+.npm/
+.eslintcache
+.stylelintcache
+.prettiercache
+package-lock.json.log
+yarn-error.log
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+.agents/
+skills-lock.json
+
+# --- Environment Variables & Secrets (CRITICAL) ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+*.env
+*.pem
+*.key
+certs/
+secrets/
+
+# --- Build Outputs ---
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.docusaurus/
+.svelte-kit/
+.vercel/
+
+# --- TypeScript ---
+*.tsbuildinfo
+
+# --- Logs & Diagnostics ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Testing & Coverage ---
+coverage/
+.nyc_output/
+cypress/screenshots/
+cypress/videos/
+.playwright/
+playwright-report/
+test-results/
+
+# --- Operating System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# --- IDEs & Code Editors ---
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swo
+*.swp
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# --- Temporary & Backup Files ---
+tmp/
+temp/
+backup/
+*.bak
+*.tmp
+*.temp
