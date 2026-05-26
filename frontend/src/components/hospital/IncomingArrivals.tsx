@@ -21,14 +21,18 @@ export interface InboundCase {
   ackTime?: string | null;
   bayNote?: string | null;
   driverStatus?: string;
+  escalationTriggered?: boolean;
+  isBypass?: boolean;
+  nudgeSent?: boolean;
 }
 
 interface IncomingArrivalsProps {
   cases: InboundCase[];
   onUpdateStatus: (id: string, newStatus: IntakeStatus, bayNote?: string) => void;
+  onEscalate?: (id: string) => void;
 }
 
-export const IncomingArrivals: React.FC<IncomingArrivalsProps> = ({ cases, onUpdateStatus }) => {
+export const IncomingArrivals: React.FC<IncomingArrivalsProps> = ({ cases, onUpdateStatus, onEscalate }) => {
   const [bayNotes, setBayNotes] = useState<Record<string, string>>({});
 
   const handleBayNoteChange = (id: string, val: string) => {
@@ -76,13 +80,20 @@ export const IncomingArrivals: React.FC<IncomingArrivalsProps> = ({ cases, onUpd
             return (
               <div key={c.id} className={cn(
                 "rounded-xl border transition-all duration-300 overflow-hidden",
+                c.isBypass ? "border-accent-crimson shadow-glow-crimson bg-accent-crimson/5 animate-pulse" :
                 isArrivingNow && c.status !== 'RECEIVED' ? "bg-accent-crimson/5 border-accent-crimson shadow-glow-crimson animate-pulse" :
                 !hasAck ? "bg-accent-amber/5 border-accent-amber/30 shadow-[0_0_15px_rgba(255,176,32,0.1)]" :
                 c.status === 'READY' ? "bg-accent-cyan/5 border-accent-cyan/30" :
                 "bg-surface-elevated border-border-glow"
               )}>
+                {/* Bypass Strip */}
+                {c.isBypass && c.status !== 'RECEIVED' && (
+                  <div className="bg-accent-crimson text-void-black text-[10px] font-extrabold uppercase tracking-widest py-1 px-4 flex items-center gap-2 justify-center select-none shadow-[0_2px_10px_rgba(255,42,95,0.4)]">
+                    🚨 FORCE DIVERSION BYPASS: Critical patient inbound by order of Command. Prepare bay!
+                  </div>
+                )}
                 {/* Header Strip */}
-                {isArrivingNow && c.status !== 'RECEIVED' && (
+                {isArrivingNow && c.status !== 'RECEIVED' && !c.isBypass && (
                   <div className="bg-accent-crimson text-void-black text-[11px] font-bold uppercase tracking-widest py-1 px-4 flex items-center gap-2 justify-center">
                     <AlertOctagon size={14} /> AMBULANCE HAS ARRIVED AT FACILITY
                   </div>
@@ -203,6 +214,22 @@ export const IncomingArrivals: React.FC<IncomingArrivalsProps> = ({ cases, onUpd
                           </Button>
                         </>
                       ) : null}
+
+                      {hasAck && c.status !== 'RECEIVED' && (
+                        c.escalationTriggered ? (
+                          <div className="w-full mt-2 py-2 bg-accent-crimson/15 border border-accent-crimson/30 text-accent-crimson text-center font-bold uppercase tracking-widest text-[9px] rounded select-none animate-pulse flex items-center justify-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-accent-crimson animate-ping" />
+                            Escalation Pending at Control
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => onEscalate && onEscalate(c.id)}
+                            className="w-full mt-2 py-1.5 border border-accent-crimson/40 bg-accent-crimson/5 hover:bg-accent-crimson/15 text-accent-crimson hover:border-accent-crimson hover:text-text-primary font-bold uppercase tracking-widest text-[9px] rounded transition-all flex items-center justify-center gap-1"
+                          >
+                            ⚠️ ESCALATE DISPATCH
+                          </button>
+                        )
+                      )}
                     </div>
                   </div>
                 </div>

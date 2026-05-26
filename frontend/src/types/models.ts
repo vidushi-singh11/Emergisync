@@ -30,6 +30,11 @@ export interface Trip {
   bay_note: string | null;
   ack_time: string | null;
   arrival_time: string | null;
+  // Command Bridge Fields
+  requested_hospital_id?: string | null;
+  nudge_sent?: boolean;
+  is_bypass?: boolean;
+  escalation_triggered?: boolean;
   // Timestamps
   created_at: string;
   updated_at: string;
@@ -47,6 +52,19 @@ export interface PoliceClearance {
   updated_at: string;
 }
 
+export interface PoliceProfile {
+  id: string;
+  unit_id: string;
+  badge_number: string;
+  rank: string;
+  assigned_junctions: string[];
+  clearance_consent: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  is_online: boolean;
+}
+
+
 export interface AmbulanceUnit {
   id: string;
   current_lat: number | null;
@@ -55,6 +73,15 @@ export interface AmbulanceUnit {
   heading: number;
   is_online: boolean;
   last_ping: string;
+  // Telemetry & Control additions
+  is_sos?: boolean;
+  pinged_at?: string | null;
+}
+
+export interface Broadcast {
+  id: string;
+  message: string;
+  created_at: string;
 }
 
 /** Hospital info as seen by the ambulance driver in the hospital picker */

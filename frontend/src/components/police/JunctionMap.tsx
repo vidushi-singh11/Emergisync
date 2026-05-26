@@ -48,6 +48,10 @@ interface JunctionMapProps {
 export const JunctionMap: React.FC<JunctionMapProps> = ({ policeCoords, activeOrders, focusCoords }) => {
   const [routes, setRoutes] = useState<Record<string, [number, number][]>>({});
 
+  const safeCoords: [number, number] = (policeCoords && policeCoords[0] && policeCoords[1])
+    ? policeCoords
+    : [40.7128, -74.0060];
+
   // Fetch approach vectors for active orders
   useEffect(() => {
     const fetchRoutes = async () => {
@@ -78,7 +82,7 @@ export const JunctionMap: React.FC<JunctionMapProps> = ({ policeCoords, activeOr
   return (
     <div className="flex-1 relative bg-void-black">
       <MapContainer 
-        center={focusCoords || policeCoords} 
+        center={focusCoords || safeCoords} 
         zoom={14} 
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
@@ -89,10 +93,10 @@ export const JunctionMap: React.FC<JunctionMapProps> = ({ policeCoords, activeOr
           attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
         />
         
-        <RecenterMap pos={focusCoords || policeCoords} />
+        <RecenterMap pos={focusCoords || safeCoords} />
 
         {/* Police Unit Location */}
-        <Marker position={policeCoords} icon={policeIcon}>
+        <Marker position={safeCoords} icon={policeIcon}>
           <Popup>
             <div className="text-void-black p-1 font-bold text-xs">YOUR POSITION</div>
           </Popup>

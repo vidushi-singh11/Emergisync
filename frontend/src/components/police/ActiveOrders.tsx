@@ -7,6 +7,7 @@ export type ClearanceStatus = 'awaiting' | 'in_progress' | 'cleared';
 
 export interface ClearanceOrder {
   id: string; // Trip ID
+  clearanceId: string;
   ambulanceId: string;
   junctionId: string;
   status: ClearanceStatus;

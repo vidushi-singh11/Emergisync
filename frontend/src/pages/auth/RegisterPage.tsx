@@ -52,6 +52,9 @@ export const RegisterPage = () => {
     traumaLevel: '3',
     totalBeds: '',
     availableBeds: '',
+    icuTotalBeds: '',
+    icuAvailableBeds: '',
+    staffCount: '',
     emergencyLine: '',
     latitude: '',
     longitude: '',
@@ -482,20 +485,43 @@ const Step3 = ({ role, data, setData, onSubmit, onPrev, loading }: { role: Role,
           </Select>
           <div className="grid grid-cols-2 gap-4">
             <Input 
-              label="TOTAL BEDS" 
+              label="TOTAL ER BEDS" 
               type="number" 
               required 
               value={data.totalBeds}
               onChange={(e) => setData({ ...data, totalBeds: e.target.value })}
             />
             <Input 
-              label="AVAILABLE BEDS" 
+              label="AVAILABLE ER BEDS" 
               type="number" 
               required 
               value={data.availableBeds}
               onChange={(e) => setData({ ...data, availableBeds: e.target.value })}
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input 
+              label="TOTAL ICU BEDS" 
+              type="number" 
+              required 
+              value={data.icuTotalBeds}
+              onChange={(e) => setData({ ...data, icuTotalBeds: e.target.value })}
+            />
+            <Input 
+              label="AVAILABLE ICU BEDS" 
+              type="number" 
+              required 
+              value={data.icuAvailableBeds}
+              onChange={(e) => setData({ ...data, icuAvailableBeds: e.target.value })}
+            />
+          </div>
+          <Input 
+            label="TOTAL STAFF COUNT" 
+            type="number" 
+            required 
+            value={data.staffCount}
+            onChange={(e) => setData({ ...data, staffCount: e.target.value })}
+          />
           <Select 
             label="TRAUMA LEVEL" 
             required

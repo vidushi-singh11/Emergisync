@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/Button';
+import type { HospitalInfo } from '../../types/models';
 
 export type TripStatus = 'idle' | 'dispatched' | 'at_scene' | 'en_route';
 
@@ -26,6 +27,7 @@ export interface TripData {
   ageGroup?: string | null;
   specialNeeds?: string[];
   driverNote?: string | null;
+  requestedHospitalId?: string | null;
 }
 
 interface DispatchSidebarProps {
@@ -38,13 +40,17 @@ interface DispatchSidebarProps {
   onComplete: () => void;
   onCancel: () => void;
   onUpdateTrip: (updates: Partial<TripData>) => void;
+  hospitals?: HospitalInfo[];
+  onRequestSwap?: (hospitalId: string) => void;
 }
 
 export const DispatchSidebar: React.FC<DispatchSidebarProps> = ({ 
-  status, trip, onAccept, onReject, onMarkArrived, onStartTransport, onComplete, onCancel, onUpdateTrip 
+  status, trip, onAccept, onReject, onMarkArrived, onStartTransport, onComplete, onCancel, onUpdateTrip,
+  hospitals = [], onRequestSwap
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<TripData>>({});
+  const [selectedSwapId, setSelectedSwapId] = useState('');
 
   const handleStartEdit = () => {
     if (!trip) return;
@@ -298,6 +304,44 @@ export const DispatchSidebar: React.FC<DispatchSidebarProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Hospital Swap Section */}
+            {(status === 'en_route' || status === 'dispatched') && (
+              trip?.requestedHospitalId ? (
+                <div className="bg-accent-amber/10 border border-accent-amber/30 rounded-lg p-2.5 mt-3 text-xs">
+                  <span className="font-bold text-accent-amber animate-pulse">SWAP REQUEST PENDING</span>
+                  <p className="text-[10px] text-text-muted mt-1">Awaiting Control Room approval for route redirection...</p>
+                </div>
+              ) : (
+                <div className="mt-3 pt-3 border-t border-border-glow/50">
+                  <p className="text-[9px] font-bold text-text-muted uppercase tracking-widest mb-1.5">Emergency Re-routing</p>
+                  <div className="flex gap-2">
+                    <select 
+                      value={selectedSwapId}
+                      onChange={e => setSelectedSwapId(e.target.value)}
+                      className="flex-1 bg-void-black border border-border-glow rounded px-2 py-1 text-[11px] text-text-primary outline-none focus:border-accent-cyan"
+                    >
+                      <option value="">Select Hospital...</option>
+                      {hospitals?.filter(h => h.name !== trip?.destination).map(h => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={() => {
+                        if (selectedSwapId && onRequestSwap) {
+                          onRequestSwap(selectedSwapId);
+                          setSelectedSwapId('');
+                        }
+                      }}
+                      disabled={!selectedSwapId}
+                      className="px-2.5 py-1 bg-accent-cyan text-void-black font-bold uppercase tracking-widest text-[9px] rounded hover:bg-accent-cyan/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      SWAP
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </section>
       </div>
