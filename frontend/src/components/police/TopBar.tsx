@@ -9,10 +9,11 @@ interface TopBarProps {
   onToggleOnline: () => void;
   activeAlerts: number;
   onViewProfile: () => void;
+  onViewHistory: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({ 
-  unitId, isOnline, onToggleOnline, activeAlerts, onViewProfile 
+  unitId, isOnline, onToggleOnline, activeAlerts, onViewProfile, onViewHistory 
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -91,10 +92,22 @@ export const TopBar: React.FC<TopBarProps> = ({
                   <span>View Profile</span>
                 </button>
 
+                {/* Mission History Action */}
+                <button 
+                  onClick={() => {
+                    onViewHistory();
+                    setShowDropdown(false);
+                  }}
+                  className="w-full py-2.5 px-3 text-left rounded-lg text-xs font-bold text-text-secondary hover:text-accent-amber hover:bg-void-black/40 flex items-center gap-2.5 transition-all outline-none mt-1"
+                >
+                  <Shield size={14} className="text-accent-amber" />
+                  <span>Missions Log</span>
+                </button>
+
                 {/* Logout Action */}
                 <button 
                   onClick={handleLogout}
-                  className="w-full py-2.5 px-3 text-left rounded-lg text-xs font-bold text-accent-crimson hover:bg-accent-crimson/10 flex items-center gap-2.5 transition-all mt-1 outline-none"
+                  className="w-full py-2.5 px-3 text-left rounded-lg text-xs font-bold text-accent-crimson hover:bg-accent-crimson/10 flex items-center gap-2.5 transition-all mt-1 outline-none border-t border-border-glow/40 pt-2"
                 >
                   <LogOut size={14} />
                   <span>Logout</span>

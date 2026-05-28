@@ -45,6 +45,10 @@ export const AmbulanceDashboard = () => {
   
   // Realtime Bridge states
   const [isSos, setIsSos] = useState(false);
+  const [sosStatus, setSosStatus] = useState<'active' | 'acknowledged' | 'police_dispatched' | 'police_arrived' | 'resolved' | null>(null);
+  const [sosAssignedPoliceId, setSosAssignedPoliceId] = useState<string | null>(null);
+  const [sosAssignedPoliceName, setSosAssignedPoliceName] = useState<string | null>(null);
+  const [sosAssignedPoliceBadge, setSosAssignedPoliceBadge] = useState<string | null>(null);
   const [activeBroadcasts, setActiveBroadcasts] = useState<string[]>([]);
   const [safetyPinged, setSafetyPinged] = useState(false);
   const [directNote, setDirectNote] = useState<string | null>(null);
@@ -116,6 +120,14 @@ export const AmbulanceDashboard = () => {
             });
           }
 
+          // Fetch initial SOS and telemetry states
+          const { data: unitData } = await supabase.from('ambulance_units').select('*').eq('id', authData.user.id).single();
+          if (unitData) {
+            setIsSos(!!unitData.is_sos);
+            setSosStatus(unitData.sos_status || null);
+            setSosAssignedPoliceId(unitData.sos_assigned_police_id || null);
+          }
+
           // Fetch Completed Trips History for the logged-in driver
           fetchHistory(currentProfileId);
         }
@@ -181,7 +193,7 @@ export const AmbulanceDashboard = () => {
   useEffect(() => {
     if (!profile.id) return;
 
-    // 1. Safety Ping subscription
+    // 1. Safety Ping & SOS updates subscription
     const pingChannel = supabase
       .channel(`safety-pings:${profile.id}`)
       .on(
@@ -202,6 +214,16 @@ export const AmbulanceDashboard = () => {
             } catch (e) {
               console.error("Audio error:", e);
             }
+          }
+
+          if (unit.is_sos !== undefined) {
+            setIsSos(unit.is_sos);
+          }
+          if (unit.sos_status !== undefined) {
+            setSosStatus(unit.sos_status);
+          }
+          if (unit.sos_assigned_police_id !== undefined) {
+            setSosAssignedPoliceId(unit.sos_assigned_police_id);
           }
         }
       )
@@ -225,6 +247,40 @@ export const AmbulanceDashboard = () => {
       supabase.removeChannel(broadcastChannel);
     };
   }, [profile.id]);
+
+  // --- FETCH ASSIGNED POLICE DETAILS ---
+  useEffect(() => {
+    if (!sosAssignedPoliceId) {
+      setSosAssignedPoliceName(null);
+      setSosAssignedPoliceBadge(null);
+      return;
+    }
+
+    const fetchPoliceDetails = async () => {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', sosAssignedPoliceId)
+          .single();
+
+        const { data: policeData } = await supabase
+          .from('police_profiles')
+          .select('unit_id, badge_number')
+          .eq('id', sosAssignedPoliceId)
+          .single();
+
+        if (profileData && policeData) {
+          setSosAssignedPoliceName(profileData.full_name);
+          setSosAssignedPoliceBadge(policeData.unit_id || policeData.badge_number);
+        }
+      } catch (err) {
+        console.error("Failed to fetch assigned police details:", err);
+      }
+    };
+
+    fetchPoliceDetails();
+  }, [sosAssignedPoliceId]);
 
   // --- REALTIME TRIP SYNC ---
   useEffect(() => {
@@ -345,6 +401,30 @@ export const AmbulanceDashboard = () => {
       return;
     }
     setIsOnline(!isOnline);
+  };
+
+  const handleToggleSos = async () => {
+    const nextSos = !isSos;
+    setIsSos(nextSos);
+    const nextStatus = nextSos ? 'active' : null;
+    setSosStatus(nextStatus);
+    if (!nextSos) {
+      setSosAssignedPoliceId(null);
+    }
+
+    try {
+      await supabase
+        .from('ambulance_units')
+        .update({
+          is_sos: nextSos,
+          sos_status: nextStatus,
+          sos_assigned_police_id: nextSos ? sosAssignedPoliceId : null,
+          sos_updated_at: new Date().toISOString()
+        })
+        .eq('id', profile.id);
+    } catch (err) {
+      console.error("Failed to update SOS status:", err);
+    }
   };
 
   const handleUpdateProfile = async (updatedData: any) => {
@@ -541,7 +621,7 @@ export const AmbulanceDashboard = () => {
         profile={profile} 
         onViewProfile={() => setViewState('profile')}
         isSos={isSos}
-        onToggleSos={() => setIsSos(!isSos)}
+        onToggleSos={handleToggleSos}
       />
 
       {/* Global Command Broadcast marquee */}
@@ -551,6 +631,31 @@ export const AmbulanceDashboard = () => {
             <span>🚨 COMMAND CENTER BROADCAST:</span>
             <span className="font-mono tracking-wide">{activeBroadcasts[0]}</span>
           </div>
+        </div>
+      )}
+
+      {/* 🚨 Panic SOS Reassurance Banner */}
+      {isSos && sosStatus && (
+        <div className={cn(
+          "py-3 px-6 text-center text-xs font-bold uppercase tracking-widest transition-all z-35 flex items-center justify-center gap-3 border-b shrink-0",
+          sosStatus === 'active' || sosStatus === 'acknowledged' ? "bg-accent-crimson/20 border-accent-crimson/30 text-accent-crimson animate-pulse" :
+          sosStatus === 'police_dispatched' ? "bg-accent-amber/20 border-accent-amber/30 text-accent-amber animate-pulse" :
+          "bg-green-500/20 border-green-500/30 text-green-400"
+        )}>
+          <span className="text-sm">🛡️</span>
+          {sosStatus === 'active' && <span>Emergency signal broadcasted. Waiting for dispatcher response...</span>}
+          {sosStatus === 'acknowledged' && <span>Signal Acknowledged by Command Center. Identifying closest unit...</span>}
+          {sosStatus === 'police_dispatched' && (
+            <span>
+              Officer <span className="underline">{sosAssignedPoliceName || 'Patrol'}</span> ({sosAssignedPoliceBadge || 'P-Unit'}) has been dispatched. Hold position, help is en route!
+            </span>
+          )}
+          {sosStatus === 'police_arrived' && (
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping inline-block" />
+              Officer <span className="underline">{sosAssignedPoliceName || 'Patrol'}</span> has arrived. Location is SECURED and guarded.
+            </span>
+          )}
         </div>
       )}
 

@@ -26,8 +26,11 @@ export const HotspotAlerts: React.FC<HotspotAlertsProps> = ({ alerts, onRequestB
           </div>
           <div className="p-4">
             <h3 className="text-xl font-bold font-mono text-text-primary leading-none mb-1">{alert.junctionId}</h3>
-            <p className="text-[12px] text-text-secondary mb-4">
+            <p className="text-[12px] text-text-secondary mb-2 leading-snug">
               <span className="text-accent-amber font-bold">{alert.unitCount} emergency units</span> converging on this junction simultaneously. Severe traffic bottleneck anticipated.
+            </p>
+            <p className="text-[9.5px] text-text-muted mb-4 uppercase tracking-wider font-semibold leading-relaxed">
+              ⚠️ Congestion Warning: Converging paths detected. Dispatch adjacent patrols to clear secondary gridlock.
             </p>
             <Button 
               size="sm" 

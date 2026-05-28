@@ -46,6 +46,12 @@ export const ActiveOrders: React.FC<ActiveOrdersProps> = ({
         </h2>
       </div>
 
+      {/* Explanatory Guidance Card */}
+      <div className="mx-4 mt-4 p-3.5 bg-surface-elevated/40 border border-border-glow/40 rounded-xl text-[10.5px] text-text-secondary leading-relaxed shrink-0">
+        <span className="font-extrabold text-accent-amber uppercase tracking-wider block mb-1">📢 Traffic Priority Override</span>
+        Override local traffic signals at junctions to force high-speed green corridors for approaching ambulances. Click <strong>Acknowledge</strong> to confirm deployment, then click <strong>Mark Cleared</strong> once you are physically in place to secure the corridor.
+      </div>
+
       <div className="p-4 space-y-4">
         {orders.map(order => (
           <div 

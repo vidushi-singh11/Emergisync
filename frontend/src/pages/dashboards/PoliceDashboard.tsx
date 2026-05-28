@@ -6,6 +6,7 @@ import { JunctionMap } from '../../components/police/JunctionMap';
 import { HotspotAlerts } from '../../components/police/HotspotAlerts';
 import type { HotspotAlert } from '../../components/police/HotspotAlerts';
 import { ProfileView } from '../../components/police/ProfileView';
+import { HistoryView } from '../../components/police/HistoryView';
 import { supabase } from '../../lib/supabase';
 import { useTripSync } from '../../hooks/useTripSync';
 
@@ -16,9 +17,24 @@ const JUNCTION_COORDINATES: Record<string, [number, number]> = {
   'JN-301': [40.7110, -74.0060]
 };
 
+// Haversine GPS Distance Calculator
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 'N/A';
+  const R = 6371; // Radius of the earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c; // Distance in km
+  return d.toFixed(2) + ' km';
+};
+
 export const PoliceDashboard = () => {
   // --- STATE ---
-  const [viewState, setViewState] = useState<'dashboard' | 'profile'>('dashboard');
+  const [viewState, setViewState] = useState<'dashboard' | 'profile' | 'history'>('dashboard');
   const [isOnline, setIsOnline] = useState(true);
   const [unitId, setUnitId] = useState('P-105');
   const [policeCoords, setPoliceCoords] = useState<[number, number]>([40.7128, -74.0060]);
@@ -205,6 +221,12 @@ export const PoliceDashboard = () => {
     };
   }, []);
 
+  // --- SOS EMERGENCY RESCUE ESCORT LIFE CYCLE ---
+  const activeRescueUnit = allAmbulanceUnits.find(u => u.is_sos && u.sos_assigned_police_id === profile.id);
+  const rescueDistance = activeRescueUnit && activeRescueUnit.current_lat && activeRescueUnit.current_lng
+    ? calculateDistance(policeCoords[0], policeCoords[1], activeRescueUnit.current_lat, activeRescueUnit.current_lng)
+    : 'Calculating...';
+
   // --- 7. MAPPING DYNAMIC CLEARANCE ORDERS ---
   const [activeClearedTrips, setActiveClearedTrips] = useState<string[]>([]);
   
@@ -273,6 +295,91 @@ export const PoliceDashboard = () => {
     }
   };
 
+  const handleAcknowledgeSosRescue = async (unitId: string) => {
+    try {
+      const activeTrip = trips.find(t => t.ambulance_id === unitId);
+      
+      // 1. Update status
+      await supabase
+        .from('ambulance_units')
+        .update({
+          sos_status: 'police_dispatched',
+          sos_updated_at: new Date().toISOString()
+        })
+        .eq('id', unitId);
+
+      // 2. Insert persistent audit log
+      await supabase
+        .from('trip_logs')
+        .insert({
+          trip_id: activeTrip ? activeTrip.id : null,
+          actor_id: profile.id,
+          action_type: 'SOS_ESCORT_DEPLOYED',
+          new_state: { ambulance_id: unitId, timestamp: new Date().toISOString() }
+        });
+    } catch (err) {
+      console.error("Failed to ACK SOS rescue:", err);
+    }
+  };
+
+  const handleConfirmArrivalSosRescue = async (unitId: string) => {
+    try {
+      const activeTrip = trips.find(t => t.ambulance_id === unitId);
+
+      // 1. Update status
+      await supabase
+        .from('ambulance_units')
+        .update({
+          sos_status: 'police_arrived',
+          sos_updated_at: new Date().toISOString()
+        })
+        .eq('id', unitId);
+
+      // 2. Insert persistent audit log
+      await supabase
+        .from('trip_logs')
+        .insert({
+          trip_id: activeTrip ? activeTrip.id : null,
+          actor_id: profile.id,
+          action_type: 'SOS_ESCORT_ARRIVED',
+          new_state: { ambulance_id: unitId, timestamp: new Date().toISOString() }
+        });
+    } catch (err) {
+      console.error("Failed to confirm arrival at SOS rescue:", err);
+    }
+  };
+
+  const handleResolveSosRescue = async (unitId: string) => {
+    try {
+      const activeTrip = trips.find(t => t.ambulance_id === unitId);
+
+      // 1. Reset columns
+      await supabase
+        .from('ambulance_units')
+        .update({
+          is_sos: false,
+          sos_status: 'resolved',
+          sos_assigned_police_id: null,
+          sos_updated_at: new Date().toISOString()
+        })
+        .eq('id', unitId);
+
+      // 2. Insert persistent audit log
+      await supabase
+        .from('trip_logs')
+        .insert({
+          trip_id: activeTrip ? activeTrip.id : null,
+          actor_id: profile.id,
+          action_type: 'SOS_ESCORT_RESOLVED',
+          new_state: { ambulance_id: unitId, timestamp: new Date().toISOString() }
+        });
+
+      alert("SOS rescue escort cleared. Scene secured successfully!");
+    } catch (err) {
+      console.error("Failed to resolve SOS rescue:", err);
+    }
+  };
+
   const handleAcknowledge = async (tripId: string) => {
     const order = orders.find(o => o.id === tripId);
     if (!order) return;
@@ -290,6 +397,7 @@ export const PoliceDashboard = () => {
     const order = orders.find(o => o.id === tripId);
     if (!order) return;
     try {
+      // 1. Update status
       await supabase
         .from('police_clearances')
         .update({ 
@@ -297,6 +405,16 @@ export const PoliceDashboard = () => {
           actual_clearance_time: new Date().toISOString()
         })
         .eq('id', order.clearanceId);
+
+      // 2. Insert persistent audit log
+      await supabase
+        .from('trip_logs')
+        .insert({
+          trip_id: order.id,
+          actor_id: profile.id,
+          action_type: 'JUNCTION_CLEARED',
+          new_state: { junction_id: order.junctionId, cleared_at: new Date().toISOString() }
+        });
 
       // Keep in local UI for 5 seconds as requested by checkpoint spec
       setActiveClearedTrips(prev => [...prev, tripId]);
@@ -388,12 +506,20 @@ export const PoliceDashboard = () => {
         </div>
       )}
 
+      {/* 🚨 Flashing Rescue Dispatch Banner */}
+      {activeRescueUnit && (
+        <div className="bg-accent-crimson text-void-black text-xs font-black py-2.5 px-6 overflow-hidden relative shrink-0 border-b border-accent-crimson/40 select-none z-40 animate-pulse text-center uppercase tracking-widest flex items-center justify-center gap-2 shadow-glow-crimson">
+          <span>🚨 URGENT DISPATCH: ESCORT AMBULANCE SOS ACTIVE • LIVE DISTANCE: {rescueDistance} 🚨</span>
+        </div>
+      )}
+
       <TopBar 
         unitId={unitId}
         isOnline={isOnline}
         onToggleOnline={handleToggleOnline}
         activeAlerts={orders.filter(o => o.status !== 'cleared').length}
         onViewProfile={() => setViewState('profile')}
+        onViewHistory={() => setViewState('history')}
       />
 
       {viewState === 'profile' ? (
@@ -402,15 +528,82 @@ export const PoliceDashboard = () => {
           onUpdateProfile={handleUpdateProfile}
           onBack={() => setViewState('dashboard')}
         />
+      ) : viewState === 'history' ? (
+        <HistoryView 
+          officerId={profile.id}
+          onBack={() => setViewState('dashboard')}
+        />
       ) : (
-        <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
-          <ActiveOrders 
-            orders={orders}
-            onAcknowledge={handleAcknowledge}
-            onMarkCleared={handleMarkCleared}
-            onEscalate={handleEscalate}
-            onFocusJunction={(coords) => setFocusCoords(coords)}
-          />
+        <div className="flex flex-1 overflow-hidden flex-col md:flex-row animate-in fade-in duration-300">
+          
+          <div className="w-[420px] border-r border-border-glow bg-surface-primary flex flex-col overflow-y-auto shrink-0">
+            {activeRescueUnit && (
+              <div className="p-5 bg-accent-crimson/15 border-b border-accent-crimson/30 flex flex-col gap-4">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-accent-crimson tracking-widest flex items-center gap-1.5 mb-1 animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
+                    SOS RESCUE ACTIVE
+                  </span>
+                  <h3 className="text-xl font-black text-text-primary uppercase tracking-tight">
+                    AMB ESCORT MISSION
+                  </h3>
+                  <p className="text-[11px] text-text-muted mt-1 uppercase font-mono">
+                    Target: {activeRescueUnit.id.substring(0, 8).toUpperCase()} (SPEED: {activeRescueUnit.speed} KM/H)
+                  </p>
+                </div>
+
+                <div className="py-2.5 px-3 rounded bg-void-black/60 border border-border-glow/50 flex justify-between items-center">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Distance:</span>
+                    <span className="text-lg font-mono font-bold text-accent-cyan">{rescueDistance}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5 text-right">
+                    <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">State:</span>
+                    <span className="text-xs font-bold text-accent-amber uppercase tracking-wider">
+                      {(!activeRescueUnit.sos_status || activeRescueUnit.sos_status === 'active') && "Triggered"}
+                      {activeRescueUnit.sos_status === 'acknowledged' && "Dispatched"}
+                      {activeRescueUnit.sos_status === 'police_dispatched' && "En Route"}
+                      {activeRescueUnit.sos_status === 'police_arrived' && "Guarding"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {(!activeRescueUnit.sos_status || activeRescueUnit.sos_status === 'active' || activeRescueUnit.sos_status === 'acknowledged') && (
+                    <button 
+                      onClick={() => handleAcknowledgeSosRescue(activeRescueUnit.id)}
+                      className="w-full py-3 bg-accent-amber text-void-black text-xs font-extrabold rounded-lg uppercase tracking-wider hover:bg-accent-amber/90 active:scale-95 transition-all shadow-glow-amber"
+                    >
+                      Acknowledge & Deploy
+                    </button>
+                  )}
+                  {activeRescueUnit.sos_status === 'police_dispatched' && (
+                    <button 
+                      onClick={() => handleConfirmArrivalSosRescue(activeRescueUnit.id)}
+                      className="w-full py-3 bg-green-500 text-void-black text-xs font-extrabold rounded-lg uppercase tracking-wider hover:bg-green-400 active:scale-95 transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+                    >
+                      Confirm Arrival & Secure
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={() => handleResolveSosRescue(activeRescueUnit.id)}
+                    className="w-full py-2 bg-surface-elevated border border-border-glow text-text-primary text-[10px] font-bold rounded-lg uppercase tracking-wider hover:text-accent-crimson hover:border-accent-crimson transition-colors"
+                  >
+                    Clear SOS & Stand Down
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <ActiveOrders 
+              orders={orders}
+              onAcknowledge={handleAcknowledge}
+              onMarkCleared={handleMarkCleared}
+              onEscalate={handleEscalate}
+              onFocusJunction={(coords) => setFocusCoords(coords)}
+            />
+          </div>
           
           <div className="flex-1 relative">
             <HotspotAlerts 

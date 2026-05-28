@@ -59,6 +59,20 @@ const redAmbulanceIcon = L.divIcon({
   iconAnchor: [16, 16]
 });
 
+const greenSecuredAmbulanceIcon = L.divIcon({
+  html: renderToStaticMarkup(
+    <div className="relative">
+      <div className="absolute -inset-4 bg-green-500/30 rounded-full animate-ping" />
+      <div className="w-9 h-9 rounded-lg bg-green-500 flex items-center justify-center text-void-black shadow-[0_0_15px_#22c55e] border-2 border-void-black relative z-10 animate-pulse">
+        <Shield size={18} fill="currentColor" />
+      </div>
+    </div>
+  ),
+  className: '',
+  iconSize: [36, 36],
+  iconAnchor: [18, 18]
+});
+
 const hospitalMarkerIcon = (isDiversion: boolean) => L.divIcon({
   html: renderToStaticMarkup(
     <div className="relative">
@@ -153,6 +167,7 @@ export const LiveOperations = () => {
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [directNoteMessage, setDirectNoteMessage] = useState('');
   const [directNoteTripId, setDirectNoteTripId] = useState<string | null>(null);
+  const [dispatchingSosUnitId, setDispatchingSosUnitId] = useState<string | null>(null);
 
   // Siren Audio Ref
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -294,11 +309,27 @@ export const LiveOperations = () => {
   }, []);
 
 
-  // --- SOS SIREN ALARM PLAYBACK SYSTEM ---
+  // --- SOS LIFE CYCLE COMPUTATIONS ---
   const activeSosUnit = units.find(u => u.is_sos && u.is_online);
+  const isSirenPlaying = activeSosUnit && (!activeSosUnit.sos_status || activeSosUnit.sos_status === 'active');
+
+  // Haversine GPS Distance Calculator
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 'N/A';
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const d = R * c; // Distance in km
+    return d.toFixed(2) + ' km';
+  };
 
   useEffect(() => {
-    if (activeSosUnit) {
+    if (isSirenPlaying) {
       // Start Siren audio
       if (!audioContextRef.current) {
         try {
@@ -339,17 +370,70 @@ export const LiveOperations = () => {
       if (sirenIntervalRef.current) clearInterval(sirenIntervalRef.current);
       if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
     };
-  }, [activeSosUnit]);
+  }, [isSirenPlaying]);
 
   // --- EVENT HANDLERS ---
+  const handleAcknowledgeSos = async (unitId: string) => {
+    // Silence siren overlay, trigger selective dispatch sidebar drawer
+    setDispatchingSosUnitId(unitId);
+    setUnits(current => current.map(u => u.id === unitId ? { ...u, sos_status: 'acknowledged' } : u));
+    try {
+      await supabase
+        .from('ambulance_units')
+        .update({ sos_status: 'acknowledged', sos_updated_at: new Date().toISOString() })
+        .eq('id', unitId);
+    } catch (err) {
+      console.error("Failed to acknowledge SOS:", err);
+    }
+  };
+
+  const handleDispatchSosPolice = async (unitId: string, officerId: string) => {
+    setUnits(current => current.map(u => u.id === unitId ? { ...u, sos_status: 'police_dispatched', sos_assigned_police_id: officerId } : u));
+    try {
+      // 1. Update ambulance telemetry status
+      const { error: ambError } = await supabase
+        .from('ambulance_units')
+        .update({
+          sos_status: 'police_dispatched',
+          sos_assigned_police_id: officerId,
+          sos_updated_at: new Date().toISOString()
+        })
+        .eq('id', unitId);
+
+      if (ambError) throw ambError;
+
+      // 2. Insert standard police clearance log to ensure operational synchronization
+      const activeTrip = trips.find(t => t.ambulance_id === unitId);
+      await supabase
+        .from('police_clearances')
+        .insert({
+          trip_id: activeTrip ? activeTrip.id : null,
+          police_unit_id: officerId,
+          junction_id: 'SOS-ESCORT',
+          status: 'SENT'
+        });
+
+      setDispatchingSosUnitId(null);
+      alert("Emergency dispatch order transmitted to Officer Patrol unit!");
+    } catch (err) {
+      console.error("Failed to dispatch police to SOS scene:", err);
+      alert("Failed to assign rescue officer. Try again.");
+    }
+  };
+
   const handleResolveSos = async (unitId: string) => {
     // Optimistic local state clearing to keep interface fast and panic-free
-    setUnits(current => current.map(u => u.id === unitId ? { ...u, is_sos: false } : u));
+    setUnits(current => current.map(u => u.id === unitId ? { ...u, is_sos: false, sos_status: null, sos_assigned_police_id: null } : u));
 
     try {
       const { error } = await supabase
         .from('ambulance_units')
-        .update({ is_sos: false })
+        .update({
+          is_sos: false,
+          sos_status: null,
+          sos_assigned_police_id: null,
+          sos_updated_at: new Date().toISOString()
+        })
         .eq('id', unitId);
       if (error) {
         console.error("Supabase SOS resolution failed:", error);
@@ -495,7 +579,7 @@ export const LiveOperations = () => {
     <div className="flex flex-1 h-full overflow-hidden relative">
       
       {/* 🚨 Fullscreen SOS alarm overlay */}
-      {activeSosUnit && (
+      {activeSosUnit && (!activeSosUnit.sos_status || activeSosUnit.sos_status === 'active') && (
         <div className="fixed inset-0 z-[10000] bg-accent-crimson/35 backdrop-blur-md border-[8px] border-accent-crimson flex flex-col items-center justify-center text-center p-8 select-none">
           <div className="w-24 h-24 rounded-full bg-accent-crimson flex items-center justify-center text-void-black mb-6 shadow-glow-crimson animate-bounce">
             <AlertTriangle size={48} className="animate-pulse" />
@@ -505,13 +589,13 @@ export const LiveOperations = () => {
             UNIT: {profiles[activeSosUnit.id]?.full_name || 'Ambulance Unit'} • SPEED: {activeSosUnit.speed} KM/H
           </p>
           <p className="text-sm max-w-lg text-text-secondary mb-8 leading-relaxed">
-            The ambulance driver has hit the physical panic triggers. The Command air traffic tower has locked down coordinates. Corridors are cleared.
+            The ambulance driver has triggered physical panic buttons. The air traffic tower has locked down coordinates. Corridors are cleared. Select a police patrol escort immediately.
           </p>
           <button 
-            onClick={() => handleResolveSos(activeSosUnit.id)}
-            className="px-8 py-4 bg-text-primary text-void-black font-extrabold uppercase tracking-widest text-xs rounded-xl shadow-glow-cyan hover:scale-105 active:scale-95 transition-all"
+            onClick={() => handleAcknowledgeSos(activeSosUnit.id)}
+            className="px-8 py-4 bg-accent-cyan text-void-black font-extrabold uppercase tracking-widest text-xs rounded-xl shadow-glow-cyan hover:scale-105 active:scale-95 transition-all"
           >
-            ACKNOWLEDGE & CLEAR ALARM
+            🛡️ ACKNOWLEDGE & DISPATCH POLICE
           </button>
         </div>
       )}
@@ -655,7 +739,11 @@ export const LiveOperations = () => {
                 <React.Fragment key={unit.id}>
                   <Marker 
                     position={[unit.current_lat, unit.current_lng]} 
-                    icon={isSos ? redAmbulanceIcon : cyanAmbulanceIcon}
+                    icon={
+                      isSos && unit.sos_status === 'police_arrived' ? greenSecuredAmbulanceIcon :
+                      isSos ? redAmbulanceIcon : 
+                      cyanAmbulanceIcon
+                    }
                   >
                     <Popup>
                       <div className="text-void-black p-2 text-xs max-w-[200px]">
@@ -702,6 +790,24 @@ export const LiveOperations = () => {
                       );
                     }
                   })()}
+
+                  {/* Draw rescue corridor polyline if police is dispatched but not yet arrived */}
+                  {unit.is_sos && unit.sos_status === 'police_dispatched' && unit.sos_assigned_police_id && (() => {
+                    const assignedOfficer = policeProfiles.find(p => p.id === unit.sos_assigned_police_id);
+                    if (assignedOfficer?.latitude && assignedOfficer?.longitude) {
+                      return (
+                        <Polyline 
+                          positions={[
+                            [unit.current_lat, unit.current_lng],
+                            [assignedOfficer.latitude, assignedOfficer.longitude]
+                          ]}
+                          color="#f59e0b" // Amber
+                          weight={3}
+                          dashArray="6, 8"
+                        />
+                      );
+                    }
+                  })()}
                 </React.Fragment>
               );
             })}
@@ -709,6 +815,10 @@ export const LiveOperations = () => {
             {/* 🛡️ Police Unit Markers (Amber Shields) */}
             {policeProfiles.map(officer => {
               if (!officer.latitude || !officer.longitude || !officer.is_online) return null;
+              
+              // If this officer is guarding an SOS ambulance, merge them (do not show separate marker)
+              const isGuardingAmbulance = units.some(u => u.is_sos && u.sos_status === 'police_arrived' && u.sos_assigned_police_id === officer.id);
+              if (isGuardingAmbulance) return null;
               
               const officerName = profiles[officer.id]?.full_name || 'Police Officer';
               const assignedClearances = policeClearances.filter(c => c.police_unit_id === officer.id && c.status !== 'RELEASED');
@@ -858,19 +968,63 @@ export const LiveOperations = () => {
           <div className="space-y-4">
             {/* SOS Alerts */}
             {activeSosUnit && (
-              <div className="p-4 bg-accent-crimson/15 border border-accent-crimson rounded-xl shadow-glow-crimson">
+              <div className={cn(
+                "p-4 border rounded-xl transition-all shadow-[0_0_15px_rgba(255,42,95,0.1)]",
+                activeSosUnit.sos_status === 'police_arrived' ? "bg-green-500/10 border-green-500/30" : "bg-accent-crimson/15 border-accent-crimson/30"
+              )}>
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-bold text-accent-crimson uppercase font-mono">PANIC ACTIVATE</span>
+                  <span className="text-xs font-bold text-accent-crimson uppercase font-mono tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-current animate-ping" />
+                    PANIC ESCALATION
+                  </span>
                   <span className="text-[9px] text-text-muted font-mono">{new Date().toLocaleTimeString()}</span>
                 </div>
-                <p className="text-sm font-bold text-text-primary">AMBULANCE SOS</p>
+                <p className="text-sm font-bold text-text-primary">Ambulance SOS Active</p>
                 <p className="text-xs text-text-muted mt-1 mb-3">Unit: {profiles[activeSosUnit.id]?.full_name || 'Ambulance'}</p>
-                <button 
-                  onClick={() => handleResolveSos(activeSosUnit.id)}
-                  className="w-full py-2 bg-accent-crimson text-void-black text-xs font-bold rounded-lg uppercase tracking-wider hover:bg-accent-crimson/90 shadow-glow-crimson"
-                >
-                  DISMISS ALARM
-                </button>
+                
+                <div className="space-y-2.5">
+                  {/* Status Banner */}
+                  <div className="py-2 px-3 rounded bg-void-black/55 border border-border-glow/50 flex flex-col gap-1">
+                    <span className="text-[9px] font-bold text-text-muted uppercase tracking-wider">Rescue Status:</span>
+                    <span className={cn(
+                      "text-[10px] font-bold uppercase tracking-widest",
+                      !activeSosUnit.sos_status || activeSosUnit.sos_status === 'active' ? "text-accent-crimson animate-pulse" :
+                      activeSosUnit.sos_status === 'acknowledged' ? "text-accent-crimson" :
+                      activeSosUnit.sos_status === 'police_dispatched' ? "text-accent-amber" :
+                      "text-green-400"
+                    )}>
+                      {(!activeSosUnit.sos_status || activeSosUnit.sos_status === 'active') && "🚨 UNACKNOWLEDGED ALERT"}
+                      {activeSosUnit.sos_status === 'acknowledged' && "⏳ AWAITING POLICE DISPATCH"}
+                      {activeSosUnit.sos_status === 'police_dispatched' && `👮 ESCORT EN ROUTE (${policeProfiles.find(p => p.id === activeSosUnit.sos_assigned_police_id)?.unit_id || 'Patrol'})`}
+                      {activeSosUnit.sos_status === 'police_arrived' && "🛡️ SECURED & GUARDED"}
+                    </span>
+                  </div>
+
+                  {/* Contextual Actions */}
+                  {(!activeSosUnit.sos_status || activeSosUnit.sos_status === 'active') && (
+                    <button 
+                      onClick={() => handleAcknowledgeSos(activeSosUnit.id)}
+                      className="w-full py-2 bg-accent-crimson text-void-black text-xs font-black rounded-lg uppercase tracking-wider hover:bg-accent-crimson/95 transition-colors shadow-glow-crimson"
+                    >
+                      Acknowledge Alert
+                    </button>
+                  )}
+                  {activeSosUnit.sos_status === 'acknowledged' && (
+                    <button 
+                      onClick={() => setDispatchingSosUnitId(activeSosUnit.id)}
+                      className="w-full py-2 bg-accent-amber text-void-black text-xs font-black rounded-lg uppercase tracking-wider hover:bg-accent-amber/95 transition-colors"
+                    >
+                      Dispatch Escort Patrol
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={() => handleResolveSos(activeSosUnit.id)}
+                    className="w-full py-2 bg-surface-elevated border border-border-glow text-text-primary text-xs font-bold rounded-lg uppercase tracking-wider hover:text-accent-crimson hover:border-accent-crimson transition-colors"
+                  >
+                    RESOLVE SOS & STAND DOWN
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1030,6 +1184,123 @@ export const LiveOperations = () => {
                 Send Alert
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👮 Selective Police Dispatch Drawer */}
+      {dispatchingSosUnitId && (
+        <div className="fixed inset-y-0 right-0 w-[420px] bg-surface-primary/95 backdrop-blur-md border-l border-accent-crimson/30 z-[9999] flex flex-col shadow-glow-crimson transition-all duration-300 animate-slide-in">
+          <div className="p-6 border-b border-border-glow/50 flex justify-between items-center bg-accent-crimson/5">
+            <div>
+              <h2 className="text-sm font-black uppercase tracking-widest text-accent-crimson flex items-center gap-2">
+                🛡️ EMERGENCY DISPATCH
+              </h2>
+              <p className="text-[10px] text-text-muted font-bold uppercase tracking-wider mt-1">
+                Distressed Unit: {profiles[dispatchingSosUnitId]?.full_name || 'Ambulance Unit'}
+              </p>
+            </div>
+            <button 
+              onClick={() => setDispatchingSosUnitId(null)}
+              className="text-text-muted hover:text-text-primary text-xs font-bold uppercase tracking-wider bg-void-black/40 border border-border-glow/30 px-3 py-1.5 rounded-lg"
+            >
+              CLOSE
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-text-secondary">
+              Available Online Patrols
+            </h3>
+
+            {policeProfiles.filter(p => p.is_online).length === 0 ? (
+              <div className="p-8 text-center border border-dashed border-border-glow/40 rounded-xl bg-void-black/35">
+                <AlertTriangle size={32} className="mx-auto text-accent-amber/40 mb-3" />
+                <p className="text-xs font-bold uppercase tracking-widest text-text-muted">No patrol units online</p>
+                <p className="text-[10px] text-text-secondary mt-1">Please direct standard emergency frequencies.</p>
+              </div>
+            ) : (
+              policeProfiles
+                .filter(p => p.is_online)
+                .map(patrol => {
+                  const name = patrol.profiles?.full_name || `Officer ${patrol.unit_id}`;
+                  const ambulanceUnit = units.find(u => u.id === dispatchingSosUnitId);
+                  const distance = ambulanceUnit && patrol.latitude && patrol.longitude
+                    ? calculateDistance(ambulanceUnit.current_lat, ambulanceUnit.current_lng, patrol.latitude, patrol.longitude)
+                    : 'Calculating...';
+
+                  return (
+                    <div 
+                      key={patrol.id}
+                      className="p-4 bg-void-black/40 border border-border-glow/50 rounded-xl hover:border-accent-amber/50 hover:bg-surface-elevated/40 transition-all flex flex-col gap-3"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-sm font-bold text-text-primary">{name}</h4>
+                          <p className="text-[10px] text-accent-amber font-mono font-bold tracking-wider uppercase mt-0.5">
+                            ID: {patrol.unit_id} • Badge: {patrol.badge_number}
+                          </p>
+                        </div>
+                        <span className="text-[10px] font-bold text-accent-cyan font-mono px-2 py-1 rounded bg-accent-cyan/10 border border-accent-cyan/20">
+                          {distance}
+                        </span>
+                      </div>
+
+                      <button 
+                        onClick={() => handleDispatchSosPolice(dispatchingSosUnitId, patrol.id)}
+                        className="w-full py-2.5 bg-accent-amber text-void-black text-xs font-extrabold rounded-lg uppercase tracking-wider hover:bg-accent-amber/90 active:scale-95 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Navigation size={14} /> DISPATCH ESCORT
+                      </button>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 🚨 Persistent Top SOS Alert Bar */}
+      {activeSosUnit && activeSosUnit.sos_status && activeSosUnit.sos_status !== 'active' && (
+        <div className={cn(
+          "absolute top-0 inset-x-0 h-11 text-[11px] font-bold uppercase tracking-widest flex items-center justify-between px-6 z-[45] select-none border-b shrink-0",
+          activeSosUnit.sos_status === 'acknowledged' ? "bg-accent-crimson/25 border-accent-crimson/40 text-accent-crimson animate-pulse" :
+          activeSosUnit.sos_status === 'police_dispatched' ? "bg-accent-amber/25 border-accent-amber/40 text-accent-amber" :
+          "bg-green-500/25 border-green-500/40 text-green-400"
+        )}>
+          <div className="flex items-center gap-2">
+            <span className="animate-ping w-2.5 h-2.5 rounded-full bg-current mr-2" />
+            <span>🚨 ACTIVE ESCALATION: AMBULANCE {profiles[activeSosUnit.id]?.full_name || 'Unit'} PANIC SOS</span>
+            <span className="text-[10px] opacity-60 ml-2 font-mono">
+              STATUS: {activeSosUnit.sos_status.toUpperCase()}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {activeSosUnit.sos_status === 'acknowledged' && (
+              <button 
+                onClick={() => setDispatchingSosUnitId(activeSosUnit.id)}
+                className="px-3 py-1 bg-accent-crimson text-void-black rounded font-black tracking-wider hover:bg-accent-crimson/90"
+              >
+                DISPATCH OFFICER
+              </button>
+            )}
+            {activeSosUnit.sos_status === 'police_dispatched' && (
+              <span className="font-mono text-text-secondary">
+                Officer {policeProfiles.find(p => p.id === activeSosUnit.sos_assigned_police_id)?.unit_id || 'Patrol'} is en route
+              </span>
+            )}
+            {activeSosUnit.sos_status === 'police_arrived' && (
+              <span className="flex items-center gap-2 text-green-400 font-extrabold animate-pulse">
+                <span>🛡️ Scene Guarded & Secured</span>
+              </span>
+            )}
+            <button 
+              onClick={() => handleResolveSos(activeSosUnit.id)}
+              className="px-3 py-1 bg-surface-elevated border border-border-glow/50 text-text-primary rounded font-bold hover:text-accent-crimson hover:border-accent-crimson transition-colors"
+            >
+              RESOLVE SOS
+            </button>
           </div>
         </div>
       )}

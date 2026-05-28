@@ -76,6 +76,9 @@ export interface AmbulanceUnit {
   // Telemetry & Control additions
   is_sos?: boolean;
   pinged_at?: string | null;
+  sos_status?: 'active' | 'acknowledged' | 'police_dispatched' | 'police_arrived' | 'resolved' | null;
+  sos_assigned_police_id?: string | null;
+  sos_updated_at?: string | null;
 }
 
 export interface Broadcast {
