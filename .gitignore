@@ -102,3 +102,4 @@ backup/
 *.bak
 *.tmp
 *.temp
+*.sql
