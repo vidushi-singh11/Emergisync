@@ -32,7 +32,9 @@ export const ControlDashboard = () => {
             <div className="w-8 h-8 rounded-lg bg-accent-violet/10 flex items-center justify-center text-accent-violet border border-accent-violet/20">
               <Radio size={18} />
             </div>
-            <span className="font-bold tracking-tight text-text-primary uppercase">STRATEGIC COMMAND</span>
+            <span className="font-bold tracking-tight text-text-primary uppercase">
+              EMERGISYNC <span className="text-accent-violet font-bold">CONTROL CENTER</span>
+            </span>
           </div>
 
           <div className="h-6 w-[1px] bg-border-glow" />

@@ -5,6 +5,7 @@
 
 # --- Node & Package Managers ---
 node_modules/
+scratch/
 jspm_packages/
 web_modules/
 .npm/

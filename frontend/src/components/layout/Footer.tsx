@@ -12,7 +12,7 @@ export const Footer = () => {
               <polygon points="12 2 22 12 12 22 2 12 12 2" />
             </svg>
           </div>
-          <span className="text-[14px] uppercase tracking-wide-08 text-text-muted font-medium">Response Mesh</span>
+          <span className="text-[14px] uppercase tracking-wide-08 text-text-muted font-medium">EmergiSync</span>
         </div>
 
         {/* Center */}

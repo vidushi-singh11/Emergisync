@@ -62,7 +62,7 @@ export const AmbulanceDashboard = () => {
     try {
       const { data, error } = await supabase
         .from('trips')
-        .select('*, hospital_profiles(profiles(full_name))')
+        .select('*, hospital_profiles!trips_hospital_id_fkey(profiles(full_name))')
         .eq('ambulance_id', userId)
         .in('status', ['COMPLETED', 'CANCELLED'])
         .order('created_at', { ascending: false })

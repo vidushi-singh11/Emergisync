@@ -43,8 +43,7 @@ export const Navbar = () => {
               </svg>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-[14px] uppercase tracking-wide-08 text-text-muted font-medium">Response</span>
-              <span className="text-[16px] font-bold text-text-primary text-glow-cyan">MESH</span>
+              <span className="text-[16px] font-black uppercase text-text-primary tracking-wide text-glow-cyan">EmergiSync</span>
             </div>
           </Link>
 

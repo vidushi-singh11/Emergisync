@@ -32,7 +32,9 @@ export const TopBar: React.FC<TopBarProps> = ({
           <div className="w-8 h-8 rounded-lg bg-accent-amber/10 flex items-center justify-center text-accent-amber border border-accent-amber/20">
             <Shield size={18} />
           </div>
-          <span className="font-bold tracking-tight text-text-primary uppercase">UNIT {unitId}</span>
+          <span className="font-bold tracking-tight text-text-primary uppercase">
+            EMERGISYNC <span className="text-accent-amber font-bold">PATROL UNIT {unitId}</span>
+          </span>
         </div>
 
         <div className="h-4 w-[1px] bg-border-glow" />
