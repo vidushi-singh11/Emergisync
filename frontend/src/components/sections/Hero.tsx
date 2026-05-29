@@ -91,17 +91,6 @@ export const Hero = () => {
               SEE HOW IT WORKS
             </Button>
           </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.8 }}
-            className="mt-4"
-          >
-            <button onClick={() => scrollTo('developer')} className="text-[14px] text-text-muted hover:text-text-primary transition-colors">
-              Are you a developer? View Documentation →
-            </button>
-          </motion.div>
         </div>
 
         {/* Right Visual (Desktop Only) */}

@@ -49,7 +49,7 @@ export const Navbar = () => {
 
           {/* Desktop Center Links */}
           <div className="hidden md:flex items-center gap-8">
-            {['How It Works', 'The Network', 'Why It Matters', 'Developer'].map((item) => (
+            {['How It Works', 'The Network', 'Why It Matters'].map((item) => (
               <button
                 key={item}
                 onClick={() => scrollTo(item.toLowerCase().replace(/\s+/g, '-'))}
@@ -88,7 +88,7 @@ export const Navbar = () => {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-void-black pt-[72px]">
           <div className="flex flex-col items-center justify-center h-full gap-8 pb-20">
-            {['How It Works', 'The Network', 'Why It Matters', 'Developer'].map((item) => (
+            {['How It Works', 'The Network', 'Why It Matters'].map((item) => (
               <button
                 key={item}
                 onClick={() => scrollTo(item.toLowerCase().replace(/\s+/g, '-'))}
