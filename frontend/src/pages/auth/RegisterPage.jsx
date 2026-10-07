@@ -139,18 +139,14 @@ export const RegisterPage = () => {
               <CheckCircle2 size={48} strokeWidth={1.5} />
             </motion.div>
           </div>
-          <h2 className="text-[24px] font-bold text-text-primary mb-4">CONFIRM YOUR EMAIL</h2>
+          <h2 className="text-[24px] font-bold text-text-primary mb-4">REGISTRATION COMPLETE</h2>
           <p className="text-text-secondary leading-relaxed mb-8">
-            An authentication link has been dispatched to <span className="text-accent-cyan font-medium">{step1Data.email}</span>. 
-            Please verify your inbox and click the link to activate your operational credentials.
+            Your operational profile for <span className="text-accent-cyan font-medium">{step1Data.email}</span> has been provisioned and verified in the emergency mesh. You can now log directly into your station dashboard.
           </p>
           <div className="space-y-4">
             <Link to="/login" className="block">
-              <Button variant="primary" className="w-full" size="lg">GO TO LOGIN</Button>
+              <Button variant="primary" className="w-full" size="lg">PROCEED TO LOGIN</Button>
             </Link>
-            <p className="text-[13px] text-text-muted">
-              Didn't receive the email? <button onClick={handleSubmit} className="text-accent-cyan hover:underline">Resend verification link</button>
-            </p>
           </div>
         </motion.div>
       </div>

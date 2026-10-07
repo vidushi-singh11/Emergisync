@@ -6,7 +6,7 @@ import { Badge } from '../ui/Badge';
 const techStack = [
   { id: 'react', title: 'React + Vite', desc: 'Component-based frontend with role-gated routing.', color: 'cyan' },
   { id: 'node', title: 'Node.js', desc: 'Business logic engine and AI scoring services.', color: 'violet' },
-  { id: 'supabase', title: 'Supabase', desc: 'Realtime database, auth, and RLS policies.', color: 'amber' },
+  { id: 'firebase', title: 'Firebase', desc: 'Realtime Firestore database and Auth security rules.', color: 'amber' },
   { id: 'maps', title: 'Map SDK', desc: 'Dark-themed tactical navigation and junction visualization.', color: 'crimson' },
 ];
 
@@ -23,10 +23,10 @@ export const Architecture = () => {
             ARCHITECTURE
           </span>
           <h2 className="text-[36px] md:text-[48px] font-bold tracking-tighter-01 text-text-primary mb-6 leading-tight">
-            React. Node. Supabase. Realtime.
+            React. Node. Firebase. Realtime.
           </h2>
           <p className="text-[18px] text-text-secondary leading-1.7 mb-10 max-w-[500px]">
-            Built on a modern stack designed for live data. React delivers role-specific dashboard trees. Node handles complex business logic — route optimization, conflict detection, priority scoring. Supabase provides the realtime PostgreSQL backbone with Row Level Security ensuring each role sees only what they are authorized to see.
+            Built on a modern stack designed for live data. React delivers role-specific dashboard trees. Node handles complex business logic — route optimization, conflict detection, priority scoring. Firebase provides the realtime Cloud Firestore backbone with security rules ensuring each role sees only what they are authorized to see.
           </p>
 
           <div className="flex flex-col gap-6">
@@ -75,19 +75,19 @@ export const Architecture = () => {
               <Badge variant="violet" className="absolute top-1/2 -translate-y-1/2 -left-10 bg-void-black text-[12px]">JWT</Badge>
             </div>
 
-            {/* Supabase Block */}
+            {/* Firebase Block */}
             <div className="bg-surface-elevated border-2 border-accent-amber/30 rounded-xl p-6 relative z-10 text-center shadow-[0_0_30px_rgba(245,158,11,0.1)]">
-              <span className="text-accent-amber font-bold text-[18px]">Supabase Realtime</span>
+              <span className="text-accent-amber font-bold text-[18px]">Firebase Auth</span>
               <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-[2px] h-8 bg-border-glow">
                 <div className="w-[2px] h-3 bg-accent-amber animate-pulse"></div>
               </div>
-              <Badge variant="amber" className="absolute top-1/2 -translate-y-1/2 -right-8 bg-void-black text-[12px]">RLS</Badge>
+              <Badge variant="amber" className="absolute top-1/2 -translate-y-1/2 -right-8 bg-void-black text-[12px]">Rules</Badge>
             </div>
 
             {/* Database Block */}
             <div className="bg-surface-elevated border-2 border-accent-crimson/30 rounded-xl p-6 relative z-10 text-center shadow-[0_0_30px_rgba(239,68,68,0.1)]">
-              <span className="text-accent-crimson font-bold text-[18px]">PostgreSQL</span>
-              <Badge variant="crimson" className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-void-black text-[12px]">GeoJSON</Badge>
+              <span className="text-accent-crimson font-bold text-[18px]">Cloud Firestore</span>
+              <Badge variant="crimson" className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-void-black text-[12px]">Realtime</Badge>
             </div>
             
           </div>

@@ -237,13 +237,13 @@ export const MapView = ({
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl font-bold font-mono text-text-primary tracking-tighter">
-              {currentPos[0].toFixed(5)}
+              {Math.abs(currentPos[0]).toFixed(5)}
             </span>
-            <span className="text-accent-cyan font-mono text-xs">N</span>
+            <span className="text-accent-cyan font-mono text-xs">{currentPos[0] >= 0 ? 'N' : 'S'}</span>
             <span className="text-xl font-bold font-mono text-text-primary tracking-tighter ml-2">
-              {currentPos[1].toFixed(5)}
+              {Math.abs(currentPos[1]).toFixed(5)}
             </span>
-            <span className="text-accent-cyan font-mono text-xs">W</span>
+            <span className="text-accent-cyan font-mono text-xs">{currentPos[1] >= 0 ? 'E' : 'W'}</span>
           </div>
         </div>
       </div>

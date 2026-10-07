@@ -1,0 +1,71 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Profiles table/collection
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+    }
+
+    // Role-specific profiles
+    match /ambulance_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(profileId);
+    }
+
+    match /police_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /hospital_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    match /control_room_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Telemetry ambulance units
+    match /ambulance_units/{unitId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Trips table
+    match /trips/{tripId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Police clearances
+    match /police_clearances/{clearanceId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Trip logs
+    match /trip_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    // Broadcasts
+    match /broadcasts/{broadcastId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+  }
+}

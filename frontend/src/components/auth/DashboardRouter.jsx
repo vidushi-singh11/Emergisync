@@ -12,30 +12,56 @@ export const DashboardRouter = () => {
   const [session, setSession] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        setSession(session);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         
-        setUserRole(_optionalChain([profile, 'optionalAccess', _ => _.role]) || null);
+        if (session && isMounted) {
+          setSession(session);
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (isMounted) {
+            setUserRole(_optionalChain([profile, 'optionalAccess', _ => _.role]) || null);
+          }
+        }
+      } catch (e) {
+        console.error("Auth check failed:", e);
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setLoading(false);
     };
 
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) setUserRole(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (!isMounted) return;
+      setSession(newSession);
+      if (newSession?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', newSession.user.id)
+          .single();
+        if (isMounted) {
+          setUserRole(_optionalChain([profile, 'optionalAccess', _ => _.role]) || null);
+          setLoading(false);
+        }
+      } else {
+        setUserRole(null);
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
   if (loading) {

@@ -9,7 +9,7 @@ import { ProfileView } from '../../components/ambulance/ProfileView';
 import { supabase } from '../../lib/supabase';
 import { useTripSync } from '../../hooks/useTripSync';
 
-import { cn } from '../../lib/utils';
+import { cn, calculateDistanceKm, estimateEtaMinutes } from '../../lib/utils';
 
 
 
@@ -160,6 +160,45 @@ export const AmbulanceDashboard = () => {
     };
     fetchData();
   }, []);
+
+  // --- DEVICE GEOLOCATION TRACKING ---
+  // Continuously track physical device position and update driver position
+  useEffect(() => {
+    if (!isOnline) return;
+
+    if (!('geolocation' in navigator)) {
+      console.warn("Geolocation API not available in this browser environment.");
+      return;
+    }
+
+    // Grab immediate high-accuracy position snapshot
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setCurrentPos([latitude, longitude]);
+      },
+      (err) => {
+        console.warn("Initial device geolocation notice:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // Watch device position continuously as driver moves
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setCurrentPos([latitude, longitude]);
+      },
+      (err) => {
+        console.warn("Device geolocation watch error:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [isOnline]);
 
   // --- TELEMETRY & LOCATION STREAMING ---
   useEffect(() => {
@@ -600,15 +639,28 @@ export const AmbulanceDashboard = () => {
     setStatus('idle');
   };
 
-  // Enhance hospitals array with mocked distances/etas for picker demo purposes
-  // (In real life, we would batch call OSRM for all hospitals from currentPos)
+  // Compute real distance & ETA dynamically from the device's live currentPos to each hospital
   const hospitalDisplayList = useMemo(() => {
-    return hospitals.map(h => ({
-      ...h,
-      distance: (Math.random() * 5 + 1).toFixed(1) + 'km',
-      eta: (Math.random() * 15 + 5).toFixed(0) + ' min',
-    }));
-  }, [hospitals]);
+    return hospitals.map(h => {
+      let distStr = '0.0km';
+      let etaStr = '0 min';
+
+      if (h.coords && h.coords[0] && h.coords[1] && currentPos && currentPos[0] && currentPos[1]) {
+        const distKm = calculateDistanceKm(currentPos[0], currentPos[1], h.coords[0], h.coords[1]);
+        if (distKm !== null) {
+          distStr = `${distKm.toFixed(1)}km`;
+          const etaMins = estimateEtaMinutes(distKm);
+          etaStr = `${etaMins} min`;
+        }
+      }
+
+      return {
+        ...h,
+        distance: distStr,
+        eta: etaStr,
+      };
+    });
+  }, [hospitals, currentPos]);
 
   return (
     <div className={cn(
