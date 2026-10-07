@@ -24,13 +24,19 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 
+const cleanEnv = (val) => {
+  if (!val) return "";
+  // Strip whitespace, quotes, and accidental commas
+  return String(val).trim().replace(/^["']|["',]+$/g, '').trim();
+};
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyFakeKeyForDevelopmentEmergiSync",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "emergisync.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "emergisync-prod",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "emergisync.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789012",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789012:web:abcdef123456"
+  apiKey: cleanEnv(import.meta.env.VITE_FIREBASE_API_KEY),
+  authDomain: cleanEnv(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
+  projectId: cleanEnv(import.meta.env.VITE_FIREBASE_PROJECT_ID),
+  storageBucket: cleanEnv(import.meta.env.VITE_FIREBASE_STORAGE_BUCKET),
+  messagingSenderId: cleanEnv(import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID),
+  appId: cleanEnv(import.meta.env.VITE_FIREBASE_APP_ID)
 };
 
 // Initialize Firebase App
