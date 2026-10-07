@@ -1,78 +1,97 @@
 # ⚡ EmergiSync — Real-Time Emergency Coordination Mesh
 
-EmergiSync is a production-grade, real-time telemetry and coordination mesh designed to synchronize actions between **Ambulance Drivers**, **Hospital ER Staff**, and **Police Junction Controllers** under high-stress situations. By replacing manual phone calls and chat boxes with a dynamic, state-synchronized telemetry pipeline, it ensures seamless patient handoffs and optimized routing.
+EmergiSync is a production-grade, real-time telemetry and coordination mesh designed to synchronize actions between **Ambulance Drivers**, **Hospital ER Staff**, **Police Junction Controllers**, and **Control Room Dispatchers** under high-stress situations. By replacing manual phone calls and radio static with a dynamic, state-synchronized telemetry pipeline, it ensures seamless patient handoffs and optimized routing.
 
 ---
 
-## 🚀 Key System Capabilities
+## 👥 The 4 Operational User Roles & Core Functionalities
 
-### 1. Bidirectional Handoff Pipeline
-- **Driver Intake Parameters**: Drivers fill out structured patient profiles (Severity L1-L4, Age Group, Special Needs like Ventilators/Oxygen, and clinical notes) before dispatch.
-- **Dynamic Facility Live Stream**: The Driver's status bar updates in real-time, showing live ER/ICU bed capacities, distance, drive times, and diversion statuses.
-- **Intake Flow Progression**: Hospital staff manage inbound arrivals through an interactive four-stage action bar:
-  `ACKNOWLEDGE` ➔ `PREPARE ER` ➔ `MARK ER READY` (with trauma bay assignment) ➔ `CONFIRM RECEIPT`.
-- **Auto-Increment Capacity**: Confirming patient receipt automatically increments the hospital's ER bed utilization and syncs with the Supabase database.
-- **Arriving Now Flashing**: Cards flash red with high-impact "ARRIVING NOW" pulses once the ambulance is detected at the facility.
+EmergiSync partitions responsibilities across 4 distinct tactical portals, each equipped with role-specific views, workflows, and realtime permissions:
 
-### 2. Active Trip Self-Healing & Locking
-- **Double-Dispatch Prevention**: The status bar dynamically locks and turns grayscale during active missions, preventing accidental double dispatches.
-- **Stale Active Trip Sweeper**: On dashboard mount, the application checks for any active trips. If duplicate active trips are found, it sorts them to display the most recent one and automatically sweeps/cancels older duplicate stale records in the database.
-- **Safe-Wipe Resets**: Wipes local dashboard states and returns the driver UI to `'idle'` the moment the active trip status transitions to `'COMPLETED'` in Supabase.
-
-### 3. Cybernetic Map Routing & Fallbacks
-- **Cyan Glowing Route Paths**: Leaflet maps draw a semi-transparent wide neon cyan glow under a sharp core path.
-- **Straight-Line Backup Path**: If the OSRM routing server is unreachable or fails to calculate a route, the map automatically draws a dashed direct path to ensure the driver is never left without guidance.
+### 1. 🚑 Ambulance Driver (`ambulance`)
+Field responders executing patient intake, transit, and hospital delivery.
+- **Hardware GPS Streaming**: Automatically streams the driver's device coordinates (`navigator.geolocation`) to Cloud Firestore every 5 seconds.
+- **Dynamic Facility Live Mesh**: Displays live capacity of nearby hospitals (available ER beds, ICU beds, trauma levels, diversion status).
+- **Haversine Distance & Drive-Time ETA**: Real-time road distance and ETA calculated directly from the device's live coordinates to each facility.
+- **Structured Patient Intake**: Captures patient severity (`CRITICAL_L1` to `MINOR_L4`), age group, special needs (ventilators, oxygen, trauma gear), and clinical notes.
+- **Cybernetic Map Navigation**: Leaflet HUD map with glowing neon cyan OSRM driving routes and straight-line backup fallback paths.
+- **Active Trip Self-Healing & Locking**: Grayscales and locks the dispatch selector during active missions to prevent double dispatches; auto-sweeps stale duplicate records.
+- **Panic SOS Trigger**: Hardware panic trigger broadcasting high-priority emergency signals to the Command Center and deploying police escort units.
+- **Handoff Progress Tracking**: Monitors destination ER stage in real time (`PENDING` ➔ `PREPARING` ➔ `READY` with trauma bay assignments ➔ `RECEIVED`).
 
 ---
 
-## 🔒 Database Security & RLS (Row-Level Security)
+### 2. 🏥 Hospital ER Staff (`hospital`)
+Emergency department administrators and triage teams managing inbound patient flow and facility resource load.
+- **Live Inbound Arrivals Monitor**: Visualizes all ambulances en route to the hospital with patient details, condition, clinical notes, and live ETA countdowns.
+- **4-Stage Handoff Pipeline**:
+  1. `ACKNOWLEDGE`: Confirms receipt of the inbound emergency broadcast.
+  2. `PREPARE ER`: Alerts surgical and nursing teams to mobilize trauma resources.
+  3. `MARK ER READY`: Declares the trauma bay prepped and assigns a specific bay (e.g., "Bay 3 - Trauma Team A").
+  4. `CONFIRM RECEIPT`: Confirms patient physical arrival at the ER door.
+- **Auto-Increment Capacity**: Confirming patient receipt automatically increments active bed usage in Firestore.
+- **"ARRIVING NOW" Visual Radar**: Flashing visual alarms pulse red when an ambulance is within proximity of facility grounds.
+- **Live Bed Capacity Management**: Toggle and adjust total and available ER beds, ICU beds, and staff count on the fly.
+- **Diversion Status Control**: Enables the facility to declare diversion status when at capacity, instantly dimming and warning all inbound ambulances on the grid.
+- **Emergency Dispatch Escalation**: One-click `⚠️ ESCALATE DISPATCH` button notifying the Control Room if bed availability crashes mid-transit.
 
-EmergiSync implements strict Row-Level Security policies to protect profile and telemetry records:
+---
 
-### Migration v3
-Adds patient metadata fields (`age_group`, `special_needs`, `driver_note`), hospital response fields (`bay_note`, `ack_time`, `arrival_time`), and ICU bed capabilities to the database.
+### 3. 🚓 Police Junction Controller (`police`)
+Traffic officers and corridor escorts stationed at intersections to guarantee unimpeded green corridors for emergency vehicles.
+- **Tactical Junction Radar Map**: Real-time GIS map displaying assigned intersection corridors and approaching ambulances.
+- **Corridor Clearance Flow**:
+  1. `ALERT SENT`: Receives route-crossing alerts with live ETA countdowns for inbound ambulances.
+  2. `ACKNOWLEDGE`: Confirms officer has received the clearance request.
+  3. `MARK CLEARED`: Manually confirms signals overridden and traffic cleared for the oncoming ambulance.
+- **Traffic Escalation Trigger**: Flags heavily blocked intersections or road accidents back to the Command Center to divert ambulances to alternate routes.
+- **Ambulance SOS Escort Missions**: Responds to ambulance panic signals with distance tracking (`Acknowledge & Deploy` ➔ `Confirm Arrival & Secure` ➔ `Stand Down`).
+- **Officer Mission History Log**: Full auditable archive of cleared corridors, timestamps, and escort missions.
 
-### Migration v4 (Base Profile Visibility Fix)
-To prevent the ambulance picker from showing `"Unknown Hospital"`, **Migration v4** selectively enables authenticated drivers to read parent profiles specifically for hospital users, maintaining privacy for police and other units:
-```sql
-CREATE POLICY "Public Read Hospital Profiles Base" 
-ON public.profiles 
-FOR SELECT 
-USING (role = 'hospital');
-```
+---
+
+### 4. 🎛️ Control Room Dispatcher (`control`)
+Central command bridge with global oversight, routing override authority, and cross-agency coordination.
+- **Global Fleet & Grid Map**: Interactive GIS tracking all active ambulance units, hospital locations, and online police officers on a unified map.
+- **Live Telemetry & Anomaly Detection**:
+  - *Ghost Units*: Detects ambulances on active trips with lost telemetry or delayed pings (>45s).
+  - *Slow Hospital Nudges*: Identifies facilities with critical inbound patients that have failed to acknowledge within 3 minutes, dispatching direct audible nudges.
+  - *Corridor Bottlenecks*: Flags junctions with multiple crossing trips for immediate police reinforcement.
+- **Cross-Agency Broadcast Mesh**: Global push broadcast marquee across all active ambulance, hospital, and police screens.
+- **Route Override & Bypass**: Direct authority to reroute an ambulance to an alternate hospital or send direct tactical text-to-speech notices to drivers.
+- **Panic SOS Command Console**: Fullscreen audiovisual alert override dispatching the closest police patrol to guard compromised ambulance units.
+- **Audit Logs & Telemetry Health**: Live inspection of system latency, WebSocket channel feeds, and inter-agency dispatch timings.
+
+---
+
+## 🔒 Security & Data Architecture
+
+- **Firebase Authentication**: Role-gated authentication with session persistence (`auth.authStateReady()`) preventing logout on page reload.
+- **Cloud Firestore**: Realtime document streams mapped with structured security rules in `firestore.rules`.
+- **Composite Query Indexes**: Preconfigured compound index schemas in `firestore.indexes.json` for high-throughput multi-field queries.
 
 ---
 
 ## ⚙️ Environment Configuration
 
-To run the application with Firebase, create a `.env.local` file inside the `frontend/` directory:
+Create a `.env` or `.env.local` file inside the `frontend/` directory with your Firebase Web App credentials:
 
 ```bash
-# frontend/.env.local
-VITE_FIREBASE_API_KEY=your-api-key
+# frontend/.env
+VITE_FIREBASE_API_KEY=AIzaSy...
 VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
-VITE_FIREBASE_APP_ID=your-app-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=1234567890
+VITE_FIREBASE_APP_ID=1:1234567890:web:...
 ```
 
 > [!CAUTION]
-> Under no circumstances should `.env.local` or any private keys be committed to Git. The `.gitignore` has been updated to prevent this.
+> Never commit private service account keys or `.env.local` to Git.
 
 ---
 
-## 📂 Detailed Git Ignore Schema
-
-The project includes a master [`.gitignore`](.gitignore) designed to prevent repository bloating and protect sensitive data:
-- **Environment variables and keys** (`.env`, `.env.local`, `*.pem`, `*.key`) are strictly blacklisted.
-- **Local editor and OS metadata** (`.vscode/`, `.idea/`, `.DS_Store`, `Thumbs.db`) are excluded to avoid configuration conflicts among developers.
-- **Testing configurations and coverage reports** (`coverage/`, Playwright/Cypress results) are omitted to keep clean builds.
-- **Dependencies** (`node_modules/`) and **compiler outputs** (`dist/`, `dist-ssr/`, `*.tsbuildinfo`) are blocked.
-
----
-
-## 🛠️ Installation & Commands
+## 🛠️ Installation & Local Development
 
 ### Prerequisites
 - Node.js (v18+)
@@ -86,12 +105,12 @@ The project includes a master [`.gitignore`](.gitignore) designed to prevent rep
    npm install
    ```
 
-2. **Run Dev Server**:
+2. **Start Development Server**:
    ```bash
    npm run dev
    ```
 
-3. **Verify & Build Client**:
+3. **Production Build**:
    ```bash
    npm run build
    ```
